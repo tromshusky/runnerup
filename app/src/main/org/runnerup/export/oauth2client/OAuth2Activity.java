@@ -47,101 +47,96 @@ import org.runnerup.util.ViewUtil;
 public class OAuth2Activity extends AppCompatActivity {
 
   /** Names used in Bundle to/from OAuth2Activity */
-    public interface OAuth2ServerCredentials {
+  public interface OAuth2ServerCredentials {
 
-        String AUTH_ARGUMENTS = "auth_arguments";
+    String AUTH_ARGUMENTS = "auth_arguments";
 
-        /** Used as title when opening authorization dialog */
-        String NAME = "name";
+    /** Used as title when opening authorization dialog */
+    String NAME = "name";
 
-        String CLIENT_ID = "client_id";
-        String CLIENT_SECRET = "client_secret";
-        String AUTH_URL = "auth_url";
-        String AUTH_EXTRA = "auth_extra";
-        String TOKEN_URL = "token_url";
-        String REDIRECT_URI = "redirect_uri";
+    String CLIENT_ID = "client_id";
+    String CLIENT_SECRET = "client_secret";
+    String AUTH_URL = "auth_url";
+    String AUTH_EXTRA = "auth_extra";
+    String TOKEN_URL = "token_url";
+    String REDIRECT_URI = "redirect_uri";
+  }
+
+  private boolean mFinished = false;
+  private String mRedirectUri = null;
+  private Bundle mArgs = null;
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  @Override
+  public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Intent intent = getIntent();
+    Bundle b = mArgs = intent.getBundleExtra(OAuth2ServerCredentials.AUTH_ARGUMENTS);
+    if (b == null) {
+      finish();
+      return;
     }
+    String auth_url = b.getString(OAuth2ServerCredentials.AUTH_URL);
+    String client_id = b.getString(OAuth2ServerCredentials.CLIENT_ID);
+    mRedirectUri = b.getString(OAuth2ServerCredentials.REDIRECT_URI);
+    String auth_extra = null;
+    if (b.containsKey(OAuth2ServerCredentials.AUTH_EXTRA)) auth_extra = b.getString(OAuth2ServerCredentials.AUTH_EXTRA);
 
-    private boolean mFinished = false;
-    private String mRedirectUri = null;
-    private Bundle mArgs = null;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Intent intent = getIntent();
-        Bundle b = mArgs = intent.getBundleExtra(OAuth2ServerCredentials.AUTH_ARGUMENTS);
-        if (b == null) {
-            finish();
-            return;
+    Uri.Builder tmp = Uri.parse(auth_url).buildUpon().appendQueryParameter("client_id", client_id).appendQueryParameter("response_type", "code").appendQueryParameter("redirect_uri", mRedirectUri);
+    if (auth_extra != null) {
+      for (String kv: auth_extra.split("&")) {
+        String[] parts = kv.split("=");
+        if (parts.length == 2) {
+          tmp.appendQueryParameter(parts[0], parts[1]);
         }
-        String auth_url = b.getString(OAuth2ServerCredentials.AUTH_URL);
-        String client_id = b.getString(OAuth2ServerCredentials.CLIENT_ID);
-        mRedirectUri = b.getString(OAuth2ServerCredentials.REDIRECT_URI);
-        String auth_extra = null;
-        if (b.containsKey(OAuth2ServerCredentials.AUTH_EXTRA))
-            auth_extra = b.getString(OAuth2ServerCredentials.AUTH_EXTRA);
-
-        Uri.Builder tmp = Uri.parse(auth_url).buildUpon()
-                .appendQueryParameter("client_id", client_id)
-                .appendQueryParameter("response_type", "code")
-                .appendQueryParameter("redirect_uri", mRedirectUri);
-        if (auth_extra != null) {
-            for (String kv : auth_extra.split("&")) {
-                String[] parts = kv.split("=");
-                if (parts.length == 2) {
-                    tmp.appendQueryParameter(parts[0], parts[1]);
-                }
-            }
-        }
-
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, tmp.build());
-        startActivity(browserIntent);
-
-        // This activity will be reopened by the redirect
-        finish();
+      }
     }
 
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleRedirect(intent);
+    Intent browserIntent = new Intent(Intent.ACTION_VIEW, tmp.build());
+    startActivity(browserIntent);
+
+    // This activity will be reopened by the redirect
+    finish();
+  }
+
+  @Override
+  public void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    handleRedirect(intent);
+  }
+
+  @Override
+  public void onResume() {
+    super.onResume();
+    handleRedirect(getIntent());
+  }
+
+  private void handleRedirect(Intent intent) {
+    if (mFinished) return;
+
+    Uri u = intent.getData();
+    if (u == null) return;
+
+    if (!u.toString().startsWith(mRedirectUri)) return;
+
+    String e = null;
+    e = u.getQueryParameter("error");
+
+    if (e != null) {
+      Log.d(getClass().getName(), "e: " + e);
+      Intent res = new Intent().putExtra("error", e);
+      setResult(RESULT_CANCELED, res);
+      mFinished = true;
+      finish();
+      return;
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        handleRedirect(getIntent());
+    String code = u.getQueryParameter("code");
+    if (code != null) {
+      mFinished = true;
+      exchangeCodeForToken(u);
     }
-
-    private void handleRedirect(Intent intent) {
-        if (mFinished) return;
-
-        Uri u = intent.getData();
-        if (u == null) return;
-
-        if (!u.toString().startsWith(mRedirectUri)) return;
-
-        String e = null;
-        e = u.getQueryParameter("error");
-
-        if (e != null) {
-            Log.d(getClass().getName(), "e: " + e);
-            Intent res = new Intent().putExtra("error", e);
-            setResult(RESULT_CANCELED, res);
-            mFinished = true;
-            finish();
-            return;
-        }
-
-        String code = u.getQueryParameter("code");
-        if (code != null) {
-            mFinished = true;
-            exchangeCodeForToken(u);
-        }
-    }
+  }
 
   private void exchangeCodeForToken(Uri uri) {
     Bundle b = mArgs;
@@ -157,79 +152,75 @@ public class OAuth2Activity extends AppCompatActivity {
     final Intent res = new Intent().putExtra("url", token_url);
     final Handler handler = new Handler(Looper.getMainLooper());
 
-    executor.execute(
-        () -> {
-          int resultCode = AppCompatActivity.RESULT_CANCELED;
-          HttpURLConnection conn = null;
+    executor.execute(() - >{
+      int resultCode = AppCompatActivity.RESULT_CANCELED;
+      HttpURLConnection conn = null;
 
-          try {
-            URL newUrl = new URL(token_url);
-            conn = (HttpURLConnection) newUrl.openConnection();
-            conn.setDoOutput(true);
-            conn.setRequestMethod(Synchronizer.RequestMethod.POST.name());
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            SyncHelper.postData(conn, fv);
-            StringBuilder obj = new StringBuilder();
-            int responseCode = conn.getResponseCode();
-            String amsg = conn.getResponseMessage();
+      try {
+        URL newUrl = new URL(token_url);
+        conn = (HttpURLConnection) newUrl.openConnection();
+        conn.setDoOutput(true);
+        conn.setRequestMethod(Synchronizer.RequestMethod.POST.name());
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        SyncHelper.postData(conn, fv);
+        StringBuilder obj = new StringBuilder();
+        int responseCode = conn.getResponseCode();
+        String amsg = conn.getResponseMessage();
 
-            try {
-              BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-              char[] buf = new char[1024];
-              int len;
-              while ((len = in.read(buf)) != -1) {
-                obj.append(buf, 0, len);
-              }
-
-              res.putExtra(DB.ACCOUNT.AUTH_CONFIG, obj.toString());
-              if (responseCode >= HttpURLConnection.HTTP_OK
-                  && responseCode < HttpURLConnection.HTTP_MULT_CHOICE) {
-                resultCode = AppCompatActivity.RESULT_OK;
-              }
-            } catch (IOException e) {
-              InputStream inS = conn.getErrorStream();
-              String msg = inS == null ? "" : SyncHelper.readInputStream(inS);
-              Log.w("oath2", "Error stream: " + responseCode + " " + amsg + "; " + msg);
-            }
-          } catch (Exception ex) {
-            ex.printStackTrace(System.err);
-            res.putExtra("ex", ex.toString());
-          } finally {
-            if (conn != null) {
-              conn.disconnect();
-            }
+        try {
+          BufferedReader in =new BufferedReader(new InputStreamReader(conn.getInputStream()));
+          char[] buf = new char[1024];
+          int len;
+          while ((len = in.read(buf)) != -1) {
+            obj.append(buf, 0, len);
           }
 
-          final int finalResultCode = resultCode;
-          handler.post(
-              () -> {
-                setResult(finalResultCode, res);
-                finish();
-              });
-        });
-    }
-
-    @Override
-    public void onDestroy() {
-    if (executor != null) {
-        executor.shutdown();
-    }
-        super.onDestroy();
-    }
-
-    public static Intent getIntent(AppCompatActivity activity, OAuth2Server server) {
-        Bundle b = new Bundle();
-        b.putString(OAuth2ServerCredentials.CLIENT_ID, server.getClientId());
-        b.putString(OAuth2ServerCredentials.CLIENT_SECRET, server.getClientSecret());
-        b.putString(OAuth2ServerCredentials.AUTH_URL, server.getAuthUrl());
-        b.putString(OAuth2ServerCredentials.TOKEN_URL, server.getTokenUrl());
-        b.putString(OAuth2ServerCredentials.REDIRECT_URI, server.getRedirectUri());
-        String extra = server.getAuthExtra();
-        if (extra != null) {
-            b.putString(OAuth2ServerCredentials.AUTH_EXTRA, extra);
+          res.putExtra(DB.ACCOUNT.AUTH_CONFIG, obj.toString());
+          if (responseCode >= HttpURLConnection.HTTP_OK && responseCode < HttpURLConnection.HTTP_MULT_CHOICE) {
+            resultCode = AppCompatActivity.RESULT_OK;
+          }
+        } catch(IOException e) {
+          InputStream inS = conn.getErrorStream();
+          String msg = inS == null ? "": SyncHelper.readInputStream(inS);
+          Log.w("oath2", "Error stream: " + responseCode + " " + amsg + "; " + msg);
         }
+      } catch(Exception ex) {
+        ex.printStackTrace(System.err);
+        res.putExtra("ex", ex.toString());
+      } finally {
+        if (conn != null) {
+          conn.disconnect();
+        }
+      }
 
-        return new Intent(activity, OAuth2Activity.class)
-                .putExtra(OAuth2ServerCredentials.AUTH_ARGUMENTS, b);
+      final int finalResultCode = resultCode;
+      handler.post(() - >{
+        setResult(finalResultCode, res);
+        finish();
+      });
+    });
+  }
+
+  @Override
+  public void onDestroy() {
+    if (executor != null) {
+      executor.shutdown();
     }
+    super.onDestroy();
+  }
+
+  public static Intent getIntent(AppCompatActivity activity, OAuth2Server server) {
+    Bundle b = new Bundle();
+    b.putString(OAuth2ServerCredentials.CLIENT_ID, server.getClientId());
+    b.putString(OAuth2ServerCredentials.CLIENT_SECRET, server.getClientSecret());
+    b.putString(OAuth2ServerCredentials.AUTH_URL, server.getAuthUrl());
+    b.putString(OAuth2ServerCredentials.TOKEN_URL, server.getTokenUrl());
+    b.putString(OAuth2ServerCredentials.REDIRECT_URI, server.getRedirectUri());
+    String extra = server.getAuthExtra();
+    if (extra != null) {
+      b.putString(OAuth2ServerCredentials.AUTH_EXTRA, extra);
+    }
+
+    return new Intent(activity, OAuth2Activity.class).putExtra(OAuth2ServerCredentials.AUTH_ARGUMENTS, b);
+  }
 }
