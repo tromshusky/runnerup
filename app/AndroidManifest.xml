@@ -190,6 +190,7 @@
 
         <activity
             android:name=".export.oauth2client.OAuth2Activity"
+            android:exported="true"
             android:parentActivityName=".view.AccountListActivity"
             android:theme="@style/AppTheme">
             <intent-filter>
