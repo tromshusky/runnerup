@@ -192,6 +192,16 @@
             android:name=".export.oauth2client.OAuth2Activity"
             android:parentActivityName=".view.AccountListActivity"
             android:theme="@style/AppTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="myapp"
+                    android:host="oauth2redirect" />
+            </intent-filter>
             <!-- Parent activity meta-data to support 4.0 and lower -->
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
@@ -229,19 +239,6 @@
             android:foregroundServiceType="location|health" />
 
         <activity android:name=".view.CreateAdvancedWorkout"/>
-
-        <activity android:name=".export.oauth2client.OAuth2Activity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="myapp"
-                    android:host="oauth2redirect" />
-            </intent-filter>
-        </activity>
 
     </application>
 </manifest>
