@@ -17,15 +17,31 @@
 
 package org.runnerup.export.oauth2client;
 
+import android.annotation.SuppressLint;
+import android.app.ProgressDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.view.View;
+import android.view.Window;
 import androidx.appcompat.app.AppCompatActivity;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.runnerup.common.util.Constants.DB;
 import org.runnerup.export.Synchronizer;
+import org.runnerup.export.util.FormValues;
 import org.runnerup.export.util.SyncHelper;
+import org.runnerup.util.ViewUtil;
 
 @SuppressLint("SetJavaScriptEnabled")
 public class OAuth2Activity extends AppCompatActivity {
